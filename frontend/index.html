@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebPython</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#e9eef8;font-family:system-ui,sans-serif}header{height:56px;padding:0 16px;border-bottom:1px solid #26304a;display:flex;align-items:center;justify-content:space-between}.status{font-size:13px;color:#9fb0ce}main{height:calc(100vh - 56px);display:grid;grid-template-columns:220px 1fr}aside{border-right:1px solid #26304a;padding:14px}.file{padding:9px;background:#151c31;border-radius:7px}.workspace{min-width:0;display:flex;flex-direction:column}.toolbar{padding:9px;border-bottom:1px solid #26304a;display:flex;gap:8px}button{background:#172039;color:#fff;border:1px solid #3b496a;border-radius:7px;padding:8px 13px;font-weight:700;cursor:pointer}button:hover{background:#243252}textarea{flex:1;min-height:250px;resize:none;border:0;outline:0;padding:16px;background:#0f1527;color:#eef2fa;font:14px/1.55 ui-monospace,monospace}.output{height:260px;border-top:1px solid #26304a;padding:12px;overflow:auto;background:#080c17}pre{white-space:pre-wrap;font:13px/1.5 ui-monospace,monospace}.good{color:#7fe2a4}.bad{color:#ff9292}@media(max-width:700px){main{grid-template-columns:1fr}aside{display:none}}
+</style>
+</head>
+<body>
+<header><strong>WebPython</strong><span id="status" class="status">Checking runtime...</span></header>
+<main><aside><div class="file">📄 main.py</div><p>Project: default</p></aside><div class="workspace"><div class="toolbar"><button onclick="build()">BUILD</button><button onclick="run()">RUN</button><button onclick="execute()">EXECUTE</button></div><textarea id="code" spellcheck="false">print("Hello from WebPython")
+
+import math
+print(math.sqrt(144))
+</textarea><div class="output"><strong>Output</strong><div id="out"><pre>Ready.</pre></div></div></div></main>
+<script>
+const payload=()=>({project:"default",filename:"main.py",code:document.getElementById("code").value});
+const esc=s=>String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+function show(data,good=true){document.getElementById("out").innerHTML=`<pre class="${good?"good":"bad"}">${esc(JSON.stringify(data,null,2))}</pre>`}
+async function call(path){try{const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload())});const j=await r.json();show(j,r.ok&&j.success!==false)}catch(e){show({error:"API connection failed",detail:e.message},false)}}
+function build(){call("/api/build")} function run(){call("/api/run")} function execute(){call("/api/execute")}
+async function health(){try{const r=await fetch("/api/health");const j=await r.json();document.getElementById("status").textContent=j.ok?"CPython 3.14.6 • READY":"CPython 3.14.6 • NOT READY"}catch(e){document.getElementById("status").textContent="API unavailable"}}
+health();
+</script>
+</body>
+</html>
