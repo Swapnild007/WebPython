@@ -1,0 +1,1 @@
+This file intentionally disables the old Pages workflow. GitHub Pages requires repository Pages configuration before actions/configure-pages can run.
