@@ -1,0 +1,9 @@
+services:
+  webpython:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      WEBPYTHON_PYTHON: /opt/cpython-3.14.6/bin/python3
+    volumes:
+      - ./workspace:/app/workspace
