@@ -20,3 +20,82 @@ jobs:
         run: python -m compileall backend
       - name: Run tests
         run: python -m pytest -q
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build WebPython image
+        run: docker build -t webpython:test .
+      - name: Start WebPython
+        run: |
+          docker run -d --name webpython-test -p 8000:8000 webpython:test
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/api/health >/tmp/health.json; then
+              cat /tmp/health.json
+              break
+            fi
+            sleep 2
+          done
+          test -s /tmp/health.json
+      - name: Verify CPython 3.14.6 runtime
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/health.json', encoding='utf-8'))
+          assert d['ok'] is True, d
+          assert d['runtime']['implementation'] == 'CPython', d
+          assert d['runtime']['version'] == '3.14.6', d
+          PY
+      - name: Prove BUILD RUN EXECUTE
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+
+          base='http://127.0.0.1:8000'
+          payload={
+            'project':'smoke',
+            'filename':'main.py',
+            'code':'print("Hello from WebPython")\nimport math\nprint(math.sqrt(144))\nimport platform\nprint(platform.python_implementation())\nprint(platform.python_version())'
+          }
+
+          def post(path, body):
+              req=urllib.request.Request(
+                  base+path,
+                  data=json.dumps(body).encode(),
+                  headers={'Content-Type':'application/json'},
+                  method='POST')
+              with urllib.request.urlopen(req) as r:
+                  return json.load(r)
+
+          build=post('/api/build', payload)
+          assert build['success'] is True, build
+          assert build['stage'] == 'BUILD', build
+          assert build['runtime']['version'] == '3.14.6', build
+
+          run=post('/api/run', {'project':'smoke'})
+          assert run['success'] is True, run
+          assert run['stage'] == 'RUN', run
+          assert run['runtime']['version'] == '3.14.6', run
+
+          execute=post('/api/execute', payload)
+          assert execute['success'] is True, execute
+          assert execute['stage'] == 'EXECUTE', execute
+          assert execute['exit_code'] == 0, execute
+          assert 'Hello from WebPython' in execute['stdout'], execute
+          assert '12.0' in execute['stdout'], execute
+          assert 'CPython' in execute['stdout'], execute
+          assert '3.14.6' in execute['stdout'], execute
+          assert execute['runtime']['implementation'] == 'CPython', execute
+          assert execute['runtime']['version'] == '3.14.6', execute
+
+          print('BUILD -> RUN -> EXECUTE: PASS')
+          print(execute['stdout'])
+          PY
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs webpython-test || true
+      - name: Stop WebPython
+        if: always()
+        run: docker rm -f webpython-test || true
